@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Details - Zynero E-Commerce</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Dyn Header -->
+  <div id="header-wrapper"></div>
+
+  <main class="container" style="flex-grow: 1; padding: 40px 24px;">
+    <!-- Back Button -->
+    <div style="margin-bottom: 20px;">
+      <a href="products.html" style="color: var(--primary-light); font-size: 14px; font-weight: 500;">&larr; Back to catalog</a>
+    </div>
+
+    <!-- Spinner -->
+    <div id="detail-loading" style="text-align: center; padding: 80px 20px;">
+      <div style="font-size: 18px; color: var(--text-muted);">Retrieving details for tech item...</div>
+    </div>
+
+    <!-- Layout Grid -->
+    <div class="detail-grid" id="detail-content-container" style="display: none;">
+      <!-- Product Image -->
+      <div class="detail-img-container">
+        <img id="detail-product-img" src="https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500" alt="" class="detail-img">
+      </div>
+
+      <!-- Info Column -->
+      <div class="detail-info">
+        <span class="detail-category" id="detail-category-badge">Category</span>
+        <h1 class="detail-title" id="detail-product-name">Product Title</h1>
+        
+        <div class="detail-rating">
+          <span class="stars" id="detail-stars">☆☆☆☆☆</span>
+          <span class="rating-count" id="detail-review-count">(0 Reviews)</span>
+        </div>
+
+        <div class="detail-price" id="detail-product-price">₹0</div>
+
+        <p class="detail-desc" id="detail-product-desc">
+          Item description loading...
+        </p>
+
+        <!-- Specifications / Meta -->
+        <div style="margin-bottom: 30px;">
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Inventory Status</span>
+            <span id="detail-stock-status" style="font-weight: 600;">In Stock</span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Category Name</span>
+            <span id="detail-category-name">Tech</span>
+          </div>
+        </div>
+
+        <!-- Quantity Picker -->
+        <div class="qty-selector" id="detail-qty-wrapper">
+          <button class="qty-btn" id="qty-minus">-</button>
+          <input type="text" value="1" readonly class="qty-input" id="qty-value">
+          <button class="qty-btn" id="qty-plus">+</button>
+        </div>
+
+        <!-- Add Button -->
+        <button id="add-to-cart-detail-btn" class="btn btn-primary" style="padding: 14px 28px; width: fit-content;">
+          Add to Cart
+        </button>
+      </div>
+    </div>
+
+    <!-- Reviews Section -->
+    <section class="reviews-section" id="reviews-block-container" style="display: none;">
+      <h2 style="font-size: 24px; font-family: var(--font-display); margin-bottom: 30px;">Customer Reviews</h2>
+      
+      <div class="reviews-grid" style="grid-template-columns: 1.2fr 0.8fr; gap: 40px;">
+        <!-- Left Side: List -->
+        <div>
+          <div id="reviews-list-container">
+            <!-- Dynamic comments -->
+          </div>
+          <div id="no-reviews-msg" style="color: var(--text-muted); font-style: italic; display: none;">
+            No reviews yet. Share your experience by leaving the first review.
+          </div>
+        </div>
+
+        <!-- Right Side: Create review -->
+        <div class="cart-summary" style="height: fit-content; padding: 24px;">
+          <h3 class="summary-title" style="font-size: 18px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Write a Review</h3>
+          
+          <div id="review-auth-prompt" style="text-align: center; padding: 20px 0; display: none;">
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">Please log in to submit a review.</p>
+            <a href="auth.html" class="btn btn-secondary">Log In</a>
+          </div>
+
+          <form id="review-form" style="display: none;">
+            <div class="form-group">
+              <label class="form-label" for="review-rating">Overall Rating</label>
+              <select id="review-rating" class="form-control" required>
+                <option value="5">5 ★★★★★ (Excellent)</option>
+                <option value="4">4 ★★★★☆ (Very Good)</option>
+                <option value="3">3 ★★★☆☆ (Good)</option>
+                <option value="2">2 ★★☆☆☆ (Fair)</option>
+                <option value="1">1 ★☆☆☆☆ (Poor)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-top: 20px;">
+              <label class="form-label" for="review-comment">Review Message</label>
+              <textarea id="review-comment" class="form-control" rows="4" placeholder="Write details about the product's performance and quality..." required style="resize: none;"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Submit Review</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Dyn Footer -->
+  <div id="footer-wrapper"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/detail.js"></script>
+</body>
+</html>

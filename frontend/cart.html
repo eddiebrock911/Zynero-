@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopping Cart - Zynero E-Commerce</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Dyn Header -->
+  <div id="header-wrapper"></div>
+
+  <main class="container" style="flex-grow: 1; padding: 40px 24px;">
+    <h1 style="font-size: 32px; font-weight: 700; font-family: var(--font-display); margin-bottom: 30px;">Your Cart</h1>
+
+    <!-- Empty State -->
+    <div id="empty-cart-container" style="display: none; text-align: center; padding: 80px 20px; background: var(--bg-card); border: var(--glass-border); border-radius: 24px;">
+      <div style="font-size: 56px; margin-bottom: 20px;">🛒</div>
+      <h3 style="font-family: var(--font-display); font-size: 22px;">Your Cart is Empty</h3>
+      <p style="color: var(--text-muted); margin-top: 10px; margin-bottom: 30px; font-size: 14px;">Build your technology setup by adding items from our shop.</p>
+      <a href="products.html" class="btn btn-primary" style="width: fit-content;">Browse Products</a>
+    </div>
+
+    <!-- Active Cart -->
+    <div class="cart-layout" id="cart-active-layout" style="display: none;">
+      
+      <!-- List Left -->
+      <div>
+        <div class="cart-table-wrapper" id="cart-items-container" style="padding: 10px 24px;">
+          <!-- Loaded dynamically -->
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; margin-top: 25px; padding: 0 10px;">
+          <a href="products.html" class="btn btn-secondary" style="font-size: 13px;">&larr; Continue Shopping</a>
+          <button id="clear-cart-btn" class="btn btn-danger" style="font-size: 13px; padding: 8px 16px;">Clear Cart</button>
+        </div>
+      </div>
+
+      <!-- Pricing Summary Right -->
+      <div class="cart-summary">
+        <h3 class="summary-title" style="font-family: var(--font-display); font-size: 20px;">Order Summary</h3>
+        
+        <div class="summary-row">
+          <span>Items Subtotal</span>
+          <span id="summary-subtotal">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>Shipping Charges</span>
+          <span id="summary-shipping">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>Estimated GST (18%)</span>
+          <span id="summary-tax">₹0</span>
+        </div>
+        
+        <div class="summary-row total" style="border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 15px; margin-top: 15px; font-size: 18px; font-weight: 700; color: var(--text-main);">
+          <span>Grand Total</span>
+          <span id="summary-total">₹0</span>
+        </div>
+
+        <button id="checkout-btn" class="btn btn-primary btn-block" style="margin-top: 30px; padding: 14px; font-size: 15px;">
+          Proceed to Checkout
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Dyn Footer -->
+  <div id="footer-wrapper"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/cart.js"></script>
+</body>
+</html>

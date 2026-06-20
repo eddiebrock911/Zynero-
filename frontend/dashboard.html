@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Dashboard - Zynero E-Commerce</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Dyn Header -->
+  <div id="header-wrapper"></div>
+
+  <main class="container" style="flex-grow: 1; padding: 40px 24px;">
+    <!-- Profile & Orders Layout -->
+    <div class="cart-layout" style="grid-template-columns: 340px 1fr; gap: 40px;">
+      
+      <!-- Profile Form Left -->
+      <div>
+        <div class="cart-summary" style="padding: 24px; position: sticky; top: 100px;">
+          <h3 class="summary-title" style="font-family: var(--font-display); font-size: 18px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">My Settings</h3>
+          
+          <form id="profile-update-form">
+            <div class="form-group">
+              <label class="form-label" for="profile-name">Full Name</label>
+              <input type="text" id="profile-name" class="form-control" required>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+              <label class="form-label" for="profile-email">Email Address</label>
+              <input type="email" id="profile-email" class="form-control" required>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+              <label class="form-label" for="profile-password">Update Password</label>
+              <input type="password" id="profile-password" class="form-control" placeholder="•••••••• (leave blank to keep)">
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 25px; font-size: 14px;">Save Settings</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Orders Column Right -->
+      <div>
+        <h2 style="font-family: var(--font-display); font-size: 26px; font-weight: 700; margin-bottom: 25px;">My Purchases</h2>
+        
+        <!-- Loading Screen -->
+        <div id="orders-loading" style="text-align: center; padding: 40px 0;">
+          <p style="color: var(--text-muted); font-size: 14px;">Loading purchase history...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="no-orders-msg" style="display: none; text-align: center; padding: 60px 20px; background: var(--bg-card); border: var(--glass-border); border-radius: 20px;">
+          <div style="font-size: 40px; margin-bottom: 15px;">📦</div>
+          <h3 style="font-family: var(--font-display); font-size: 18px; font-weight: 600;">No Purchases Yet</h3>
+          <p style="color: var(--text-muted); margin-top: 5px; font-size: 13px;">Your order history is empty. Go browse our premium tech catalog!</p>
+          <a href="products.html" class="btn btn-secondary" style="margin-top: 20px; font-size: 13px;">Start Shopping</a>
+        </div>
+
+        <!-- Dynamic List -->
+        <div id="orders-history-list">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Checkout Success Modal -->
+  <div id="success-order-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div class="auth-wrapper" style="max-width: 480px; text-align: center; border-color: var(--success); box-shadow: 0 0 40px rgba(16, 185, 129, 0.25); padding: 40px; position: relative;">
+      <div style="font-size: 64px; margin-bottom: 15px;">🎉</div>
+      <h2 style="font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--success);">Order Placed Successfully!</h2>
+      <p style="color: var(--text-muted); font-size: 14px; margin-top: 10px; line-height: 1.6;">Thank you for shopping with Zynero. Your payment was verified and shipment details are listed below.</p>
+      
+      <div style="background: rgba(255, 255, 255, 0.02); border: var(--glass-border); border-radius: 12px; padding: 15px; margin: 25px 0; text-align: left;">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+          <span style="color: var(--text-muted);">Order Reference ID</span>
+          <span id="success-modal-order-id" style="font-weight: 600; font-family: monospace;">---</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+          <span style="color: var(--text-muted);">Shipment Location</span>
+          <span id="success-modal-destination" style="font-weight: 600;">---</span>
+        </div>
+      </div>
+
+      <button id="success-modal-close-btn" class="btn btn-primary btn-block" style="padding: 12px;">Go to My Orders</button>
+    </div>
+  </div>
+
+  <!-- Dyn Footer -->
+  <div id="footer-wrapper"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

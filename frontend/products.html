@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Tech Catalog - Zynero E-Commerce</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Dyn Header -->
+  <div id="header-wrapper"></div>
+
+  <main class="container" style="flex-grow: 1; padding: 40px 24px;">
+    <div style="margin-bottom: 30px;">
+      <h1 style="font-size: 32px; font-weight: 700; font-family: var(--font-display);">Explore Products</h1>
+      <p style="color: var(--text-muted); font-size: 14px;">Browse and filter our premium curated technology collection</p>
+    </div>
+
+    <!-- Layout Grid -->
+    <div class="cart-layout" style="grid-template-columns: 280px 1fr; gap: 30px;">
+      
+      <!-- Filter Sidebar -->
+      <aside class="cart-summary" style="padding: 24px;">
+        <h3 class="summary-title" style="font-size: 18px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Filters</h3>
+        
+        <!-- Category Option -->
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="filter-category" class="form-control">
+            <option value="All">All Categories</option>
+            <option value="Audio">Audio Equipment</option>
+            <option value="Gaming">Gaming Gear</option>
+            <option value="Wearables">Smart Wearables</option>
+            <option value="Computers">Computers & Laptops</option>
+            <option value="Accessories">Accessories</option>
+          </select>
+        </div>
+
+        <!-- Price Range Option -->
+        <div class="form-group" style="margin-top: 25px;">
+          <label class="form-label">Price Range (INR)</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="number" id="filter-min-price" class="form-control" placeholder="Min" style="padding: 8px;">
+            <span style="color: var(--text-muted); font-size: 12px;">to</span>
+            <input type="number" id="filter-max-price" class="form-control" placeholder="Max" style="padding: 8px;">
+          </div>
+        </div>
+
+        <!-- Sort Option -->
+        <div class="form-group" style="margin-top: 25px;">
+          <label class="form-label">Sort Order</label>
+          <select id="filter-sort" class="form-control">
+            <option value="newest">Newest Arrivals</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="rating">Top Customer Rated</option>
+          </select>
+        </div>
+
+        <!-- Reset Button -->
+        <button id="reset-filters-btn" class="btn btn-secondary btn-block" style="margin-top: 30px;">Reset Filters</button>
+      </aside>
+
+      <!-- Shop Grid -->
+      <div>
+        <!-- Summary Info -->
+        <div class="filter-bar" style="margin-bottom: 25px; background: var(--bg-card); border: var(--glass-border); border-radius: 12px; padding: 12px 20px;">
+          <div id="search-status-text" style="color: var(--text-muted); font-size: 14px;">Loading products...</div>
+        </div>
+
+        <!-- Product Cards Grid -->
+        <div class="product-grid" id="products-grid-container" style="margin-top: 0;">
+          <!-- Loaded dynamically -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-products-msg" style="display: none; text-align: center; padding: 80px 20px; background: var(--bg-card); border: var(--glass-border); border-radius: 24px;">
+          <div style="font-size: 48px; margin-bottom: 20px;">📦</div>
+          <h3 style="font-family: var(--font-display); font-size: 20px;">No Matches Found</h3>
+          <p style="color: var(--text-muted); margin-top: 10px; font-size: 14px;">Try modifying search keywords or clearing filters.</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Dyn Footer -->
+  <div id="footer-wrapper"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/products.js"></script>
+</body>
+</html>

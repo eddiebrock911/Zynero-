@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Workspace - Zynero E-Commerce</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Dyn Header -->
+  <div id="header-wrapper"></div>
+
+  <main class="container" style="flex-grow: 1; padding: 40px 24px;">
+    <h1 style="font-size: 32px; font-weight: 700; font-family: var(--font-display); margin-bottom: 30px;">Admin Workspace</h1>
+
+    <div class="admin-grid" style="gap: 30px;">
+      <!-- Navigation Left -->
+      <aside class="admin-sidebar">
+        <button class="admin-menu-item active" id="menu-overview-btn">
+          📊 Dashboard Metrics
+        </button>
+        <button class="admin-menu-item" id="menu-products-btn">
+          📦 Inventory Manager
+        </button>
+        <button class="admin-menu-item" id="menu-orders-btn">
+          📋 Order Dispatcher
+        </button>
+      </aside>
+
+      <!-- Viewports Right -->
+      <div>
+        
+        <!-- 1. Metrics Overview Section -->
+        <section id="section-overview">
+          <div class="admin-metrics" style="gap: 20px; margin-bottom: 30px;">
+            <div class="metric-card">
+              <div class="metric-title">Gross Revenue</div>
+              <div class="metric-value" id="metric-revenue">₹0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Orders Tracked</div>
+              <div class="metric-value" id="metric-orders">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Unique SKUs</div>
+              <div class="metric-value" id="metric-products">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Order Conversion</div>
+              <div class="metric-value" id="metric-conversion">100%</div>
+            </div>
+          </div>
+
+          <div class="cart-summary" style="padding: 24px; background: var(--bg-card); border: var(--glass-border); border-radius: 16px;">
+            <h3 class="summary-title" style="font-size: 18px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Administration console</h3>
+            <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">Use this interface to govern inventory listings, adjust warehouse quantities, and update order statuses. Unauthorized changes are prevented by server-side JWT verification checks.</p>
+          </div>
+        </section>
+
+        <!-- 2. Inventory Manager Section -->
+        <section id="section-products" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="font-size: 20px; font-family: var(--font-display);">Products Catalog</h3>
+            <button id="add-product-modal-btn" class="btn btn-primary">+ Add Product</button>
+          </div>
+
+          <div class="cart-table-wrapper" style="padding: 0;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Product Details</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Stock Units</th>
+                  <th style="text-align: right;">Action Config</th>
+                </tr>
+              </thead>
+              <tbody id="admin-products-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 3. Orders dispatcher Section -->
+        <section id="section-orders" style="display: none;">
+          <h3 style="font-size: 20px; margin-bottom: 20px; font-family: var(--font-display);">Customer Orders</h3>
+
+          <div class="cart-table-wrapper" style="padding: 0;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Order Reference</th>
+                  <th>Customer</th>
+                  <th>Date & Time</th>
+                  <th>Amount</th>
+                  <th>Payment Status</th>
+                  <th style="text-align: right;">Fulfillment Tracking</th>
+                </tr>
+              </thead>
+              <tbody id="admin-orders-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Product Modal Form -->
+  <div id="product-form-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div class="auth-wrapper" style="max-width: 540px; border-color: var(--primary-light); padding: 30px; position: relative;">
+      <h2 id="modal-form-title" style="font-family: var(--font-display); font-size: 22px; margin-bottom: 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 10px;">Create Listing</h2>
+      
+      <form id="admin-product-form">
+        <input type="hidden" id="form-product-id">
+        
+        <div class="form-group">
+          <label class="form-label" for="form-name">Product Label</label>
+          <input type="text" id="form-name" class="form-control" required placeholder="e.g. Pro Gaming Mouse">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+          <div class="form-group">
+            <label class="form-label" for="form-price">Price (INR)</label>
+            <input type="number" id="form-price" class="form-control" required min="0" placeholder="e.g. 2999">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="form-stock">Stock Units</label>
+            <input type="number" id="form-stock" class="form-control" required min="0" placeholder="e.g. 50">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+          <div class="form-group">
+            <label class="form-label" for="form-category">Category</label>
+            <select id="form-category" class="form-control" required>
+              <option value="Audio">Audio</option>
+              <option value="Gaming">Gaming</option>
+              <option value="Wearables">Wearables</option>
+              <option value="Computers">Computers</option>
+              <option value="Accessories">Accessories</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="form-image">Product Image URL</label>
+            <input type="url" id="form-image" class="form-control" placeholder="https://images.unsplash.com/..." required>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label class="form-label" for="form-description">Description Text</label>
+          <textarea id="form-description" class="form-control" rows="4" placeholder="Detailed product specifications..." required style="resize: none;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px;">
+          <button type="button" id="form-cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dyn Footer -->
+  <div id="footer-wrapper"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

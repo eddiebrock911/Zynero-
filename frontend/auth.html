@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login / Sign Up - Zynero E-Commerce</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  
+  <!-- Dyn Header -->
+  <div id="header-wrapper"></div>
+
+  <main style="flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px;">
+    <div class="auth-wrapper">
+      
+      <!-- Login Section -->
+      <div id="login-form-container">
+        <div class="auth-header">
+          <h2>Welcome Back</h2>
+          <p>Sign in to continue your premium shopping experience</p>
+        </div>
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label" for="login-email">Email Address</label>
+            <input type="email" id="login-email" class="form-control" placeholder="name@example.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="login-password">Password</label>
+            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top: 10px;">Sign In</button>
+        </form>
+        <div class="auth-footer">
+          New to Zynero? <a href="#" id="show-signup-btn">Create an account</a>
+        </div>
+      </div>
+
+      <!-- Signup Section (Hidden by default) -->
+      <div id="signup-form-container" style="display: none;">
+        <div class="auth-header">
+          <h2>Create Account</h2>
+          <p>Join us today to save items and track order status</p>
+        </div>
+        <form id="signup-form">
+          <div class="form-group">
+            <label class="form-label" for="signup-name">Full Name</label>
+            <input type="text" id="signup-name" class="form-control" placeholder="John Doe" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="signup-email">Email Address</label>
+            <input type="email" id="signup-email" class="form-control" placeholder="name@example.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="signup-password">Password</label>
+            <input type="password" id="signup-password" class="form-control" placeholder="••••••••" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="signup-confirm-password">Confirm Password</label>
+            <input type="password" id="signup-confirm-password" class="form-control" placeholder="••••••••" required minlength="6">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top: 10px;">Sign Up</button>
+        </form>
+        <div class="auth-footer">
+          Already have an account? <a href="#" id="show-login-btn">Sign in here</a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Dyn Footer -->
+  <div id="footer-wrapper"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
