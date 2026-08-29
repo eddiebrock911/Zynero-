@@ -1,5 +1,30 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+// Load environment variables from root .env or backend .env
+const rootEnvPath = path.join(__dirname, '../.env');
+const backendEnvPath = path.join(__dirname, '.env');
+
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath });
+} else if (fs.existsSync(backendEnvPath)) {
+  dotenv.config({ path: backendEnvPath });
+} else {
+  dotenv.config();
+}
+
+// Validate critical environment variables
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = process.env.PORT || 5000;
+
+if (NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable is required in production mode.');
+    process.exit(1);
+  }
+}
+
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -18,9 +43,26 @@ const app = express();
 // Connect Database
 connectDB();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// CORS Configuration
+const allowedOrigin = process.env.CLIENT_ORIGIN;
+if (allowedOrigin) {
+  app.use(cors({ origin: allowedOrigin, credentials: true }));
+} else {
+  app.use(cors());
+}
+
+// Request body parsing with size safety limit
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // API Routes
 app.use('/api/users', userRoutes);
@@ -28,8 +70,36 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/cart', cartRoutes);
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    environment: NODE_ENV,
+    dbMode: global.dbConnected ? 'MongoDB' : 'JSON Fallback'
+  });
+});
+
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Unknown API routes handler
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Centralized Express Error Handler
+app.use((err, req, res, next) => {
+  const statusCode = res.statusCode && res.statusCode !== 200 ? res.statusCode : (err.status || 500);
+  
+  if (NODE_ENV !== 'production') {
+    console.error('Express Error Handler:', err);
+  }
+
+  res.status(statusCode).json({
+    message: err.message || 'An unexpected internal server error occurred',
+    ...(NODE_ENV !== 'production' && { stack: err.stack })
+  });
+});
 
 // Helper to seed initial sample products if database is empty
 const seedProducts = async () => {
@@ -110,7 +180,8 @@ const seedProducts = async () => {
 // Seed products on start
 seedProducts();
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
 });
+
+module.exports = { app, server };

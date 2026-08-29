@@ -97,14 +97,27 @@ if (!fs.existsSync(FILE_PATH)) {
 
 const readData = () => {
   try {
-    return JSON.parse(fs.readFileSync(FILE_PATH, 'utf8'));
+    const raw = fs.readFileSync(FILE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      products: Array.isArray(parsed.products) ? parsed.products : initialData.products,
+      orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+      carts: Array.isArray(parsed.carts) ? parsed.carts : []
+    };
   } catch (err) {
-    return initialData;
+    return JSON.parse(JSON.stringify(initialData));
   }
 };
 
 const writeData = (data) => {
-  fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2));
+  try {
+    const tempPath = `${FILE_PATH}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2));
+    fs.renameSync(tempPath, FILE_PATH);
+  } catch (err) {
+    fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2));
+  }
 };
 
 module.exports = { readData, writeData };

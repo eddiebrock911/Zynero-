@@ -12,25 +12,25 @@ const reviewSchema = new mongoose.Schema({
 
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  price: { type: Number, required: true, default: 0 },
+  price: { type: Number, required: true, min: 0, default: 0 },
   images: [{ type: String, required: true }],
   category: { type: String, required: true },
-  stock: { type: Number, required: true, default: 0 },
+  stock: { type: Number, required: true, min: 0, default: 0 },
   description: { type: String, required: true },
   reviews: [reviewSchema],
-  rating: { type: Number, required: true, default: 0 },
-  numReviews: { type: Number, required: true, default: 0 }
+  rating: { type: Number, required: true, default: 0, min: 0, max: 5 },
+  numReviews: { type: Number, required: true, default: 0, min: 0 }
 }, {
   timestamps: true
 });
 
 const MongooseProduct = mongoose.model('Product', productSchema);
 
-// Mock Query Helper to chain sorting and acting as a thenable
 class MockProductQuery {
   constructor(dataArray) {
-    this.data = dataArray;
+    this.data = Array.isArray(dataArray) ? [...dataArray] : [];
   }
+
   sort(sortObj) {
     if (!sortObj) return this;
     const field = Object.keys(sortObj)[0];
@@ -40,10 +40,9 @@ class MockProductQuery {
       let valA = a[field];
       let valB = b[field];
       
-      // Handle date conversion if sorting by date/createdAt
       if (field === 'createdAt') {
-        valA = new Date(valA).getTime();
-        valB = new Date(valB).getTime();
+        valA = new Date(valA || 0).getTime();
+        valB = new Date(valB || 0).getTime();
       }
 
       if (valA < valB) return order === 1 ? -1 : 1;
@@ -52,103 +51,55 @@ class MockProductQuery {
     });
     return this;
   }
-  async then(resolve, reject) {
+
+  select(fields) {
+    return this;
+  }
+
+  then(resolve, reject) {
     try {
       const mapped = this.data.map(p => new MockProductInstance(p));
-      resolve(mapped);
+      return resolve(mapped);
     } catch (err) {
-      if (reject) reject(err);
+      if (reject) return reject(err);
+      throw err;
     }
   }
-}
 
-// Mock Product Model
-class MockProduct {
-  static find(query = {}) {
-    const data = readData();
-    let results = [...data.products];
-
-    // Filter by category
-    if (query.category) {
-      results = results.filter(p => p.category === query.category);
-    }
-
-    // Filter by price
-    if (query.price) {
-      if (query.price.$gte !== undefined) {
-        results = results.filter(p => p.price >= query.price.$gte);
-      }
-      if (query.price.$lte !== undefined) {
-        results = results.filter(p => p.price <= query.price.$lte);
-      }
-    }
-
-    // Keyword search (fuzzy search on name and description)
-    if (query.$or) {
-      const keywordRegexes = query.$or.map(cond => {
-        const fieldName = Object.keys(cond)[0];
-        const pattern = cond[fieldName].$regex;
-        return { field: fieldName, regex: new RegExp(pattern, 'i') };
-      });
-
-      results = results.filter(p => {
-        return keywordRegexes.some(r => r.regex.test(p[r.field] || ''));
-      });
-    }
-
-    return new MockProductQuery(results);
-  }
-
-  static async findById(id) {
-    const data = readData();
-    const product = data.products.find(p => p._id === id);
-    if (!product) return null;
-    return new MockProductInstance(product);
-  }
-
-  static async countDocuments() {
-    const data = readData();
-    return data.products.length;
-  }
-
-  static async deleteOne({ _id }) {
-    const data = readData();
-    const initialLen = data.products.length;
-    data.products = data.products.filter(p => p._id !== _id);
-    writeData(data);
-    return { deletedCount: initialLen - data.products.length };
-  }
-
-  static async insertMany(productsArray) {
-    const data = readData();
-    const formatted = productsArray.map((p, index) => ({
-      _id: p._id || `prod_${Date.now()}_${index}`,
-      reviews: [],
-      rating: p.rating || 0,
-      numReviews: p.numReviews || 0,
-      ...p
-    }));
-    data.products.push(...formatted);
-    writeData(data);
-    return formatted;
+  catch(reject) {
+    return this.then(null, reject);
   }
 }
 
 class MockProductInstance {
   constructor(fields) {
-    Object.assign(this, fields);
-    if (!this.reviews) this.reviews = [];
+    Object.assign(this, JSON.parse(JSON.stringify(fields || {})));
+    if (!Array.isArray(this.reviews)) this.reviews = [];
+    if (!Array.isArray(this.images)) this.images = [];
+    this.price = Number(this.price) || 0;
+    this.stock = Number(this.stock) || 0;
+    this.rating = Number(this.rating) || 0;
+    this.numReviews = Number(this.numReviews) || 0;
   }
+
   async save() {
     const data = readData();
     
-    // Check if new product or edit
     if (!this._id) {
       this._id = `prod_${Math.random().toString(36).substring(2, 10)}`;
       this.createdAt = new Date().toISOString();
-      this.reviews = [];
+      if (!this.reviews) this.reviews = [];
       this.rating = 0;
       this.numReviews = 0;
+    }
+
+    if (this.reviews && this.reviews.length > 0) {
+      this.numReviews = this.reviews.length;
+      const totalRating = this.reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+      this.rating = Number((totalRating / this.reviews.length).toFixed(1));
+    } else {
+      this.numReviews = 0;
+      this.rating = 0;
     }
 
     this.updatedAt = new Date().toISOString();
@@ -163,6 +114,80 @@ class MockProductInstance {
     
     writeData(data);
     return this;
+  }
+}
+
+class MockProduct {
+  static find(query = {}) {
+    const data = readData();
+    let results = [...data.products];
+
+    // Filter by category
+    if (query.category && query.category !== 'All') {
+      results = results.filter(p => p.category.toLowerCase() === query.category.toLowerCase());
+    }
+
+    // Filter by price
+    if (query.price) {
+      if (query.price.$gte !== undefined && !isNaN(query.price.$gte)) {
+        results = results.filter(p => p.price >= query.price.$gte);
+      }
+      if (query.price.$lte !== undefined && !isNaN(query.price.$lte)) {
+        results = results.filter(p => p.price <= query.price.$lte);
+      }
+    }
+
+    // Keyword search (fuzzy regex search on name and description)
+    if (query.$or && Array.isArray(query.$or)) {
+      const keywordRegexes = query.$or.map(cond => {
+        const fieldName = Object.keys(cond)[0];
+        const pattern = cond[fieldName].$regex || '';
+        return { field: fieldName, regex: new RegExp(pattern, 'i') };
+      });
+
+      results = results.filter(p => {
+        return keywordRegexes.some(r => r.regex.test(p[r.field] || ''));
+      });
+    }
+
+    return new MockProductQuery(results);
+  }
+
+  static async findById(id) {
+    if (!id) return null;
+    const data = readData();
+    const product = data.products.find(p => p._id.toString() === id.toString());
+    if (!product) return null;
+    return new MockProductInstance(product);
+  }
+
+  static async countDocuments(query = {}) {
+    const data = readData();
+    return data.products.length;
+  }
+
+  static async deleteOne({ _id }) {
+    const data = readData();
+    const initialLen = data.products.length;
+    data.products = data.products.filter(p => p._id.toString() !== _id.toString());
+    writeData(data);
+    return { deletedCount: initialLen - data.products.length };
+  }
+
+  static async insertMany(productsArray) {
+    const data = readData();
+    const formatted = productsArray.map((p, index) => ({
+      _id: p._id || `prod_${Date.now()}_${index}`,
+      reviews: Array.isArray(p.reviews) ? p.reviews : [],
+      rating: Number(p.rating) || 0,
+      numReviews: Number(p.numReviews) || 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...p
+    }));
+    data.products.push(...formatted);
+    writeData(data);
+    return formatted.map(p => new MockProductInstance(p));
   }
 }
 

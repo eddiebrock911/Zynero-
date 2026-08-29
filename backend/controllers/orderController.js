@@ -6,62 +6,126 @@ const Product = require('../models/Product');
 // Initialize Razorpay
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
-let razorpay;
+let razorpay = null;
 let isMockRazorpay = true;
 
-if (keyId && keySecret && !keySecret.startsWith('rzp_test_dummy') && !keySecret.includes('dummy_secret_key')) {
+if (
+  keyId && 
+  keySecret && 
+  !keyId.includes('dummy') &&
+  !keySecret.includes('dummy') &&
+  !keySecret.startsWith('dummy_')
+) {
   try {
     razorpay = new Razorpay({
       key_id: keyId,
       key_secret: keySecret
     });
     isMockRazorpay = false;
-    console.log('Razorpay SDK initialized successfully.');
   } catch (err) {
-    console.error('Error initializing Razorpay, using mock mode:', err.message);
+    console.error('Error initializing Razorpay SDK, using mock mode:', err.message);
+    isMockRazorpay = true;
   }
-} else {
-  console.log('Using simulated Razorpay mode. Checkout will proceed using mock payments.');
 }
 
 // @desc    Create new order & Razorpay order
 // @route   POST /api/orders
 // @access  Private
 const addOrderItems = async (req, res) => {
-  const {
-    orderItems,
-    shippingAddress,
-    itemsPrice,
-    taxPrice,
-    shippingPrice,
-    totalPrice
-  } = req.body;
+  const { orderItems, shippingAddress } = req.body;
 
-  if (!orderItems || orderItems.length === 0) {
-    return res.status(400).json({ message: 'No order items' });
+  if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+    return res.status(400).json({ message: 'No order items provided' });
+  }
+
+  if (
+    !shippingAddress ||
+    !shippingAddress.street ||
+    !shippingAddress.city ||
+    !shippingAddress.state ||
+    !shippingAddress.zipCode
+  ) {
+    return res.status(400).json({ message: 'Complete shipping address is required' });
   }
 
   try {
+    // Validate each order item against the database and calculate prices server-side
+    const verifiedOrderItems = [];
+    let itemsPrice = 0;
+
+    for (const item of orderItems) {
+      const prodId = (item.product && typeof item.product === 'object' && item.product._id) 
+        ? item.product._id 
+        : (item.product || item._id);
+
+      if (!prodId) {
+        return res.status(400).json({ message: 'Invalid product in order items' });
+      }
+
+      const product = await Product.findById(prodId);
+      if (!product) {
+        return res.status(400).json({ message: `Product not found: ${item.name || prodId}` });
+      }
+
+      const qty = parseInt(item.qty, 10);
+      if (isNaN(qty) || qty < 1) {
+        return res.status(400).json({ message: `Invalid quantity for ${product.name}` });
+      }
+
+      if (product.stock < qty) {
+        return res.status(400).json({
+          message: `Insufficient stock for "${product.name}". Available: ${product.stock}, requested: ${qty}`
+        });
+      }
+
+      const image = (product.images && product.images.length > 0)
+        ? product.images[0]
+        : 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500';
+
+      const itemPrice = Number(product.price);
+      verifiedOrderItems.push({
+        product: product._id,
+        name: product.name,
+        image,
+        price: itemPrice,
+        qty
+      });
+
+      itemsPrice += itemPrice * qty;
+    }
+
+    // Server-side calculations
+    const shippingPrice = itemsPrice > 10000 ? 0 : 150;
+    const taxPrice = Math.round(itemsPrice * 0.18);
+    const totalPrice = itemsPrice + shippingPrice + taxPrice;
+
     // 1. Create order in database
     const order = new Order({
       user: req.user._id,
-      orderItems,
-      shippingAddress,
+      orderItems: verifiedOrderItems,
+      shippingAddress: {
+        street: String(shippingAddress.street).trim(),
+        city: String(shippingAddress.city).trim(),
+        state: String(shippingAddress.state).trim(),
+        zipCode: String(shippingAddress.zipCode).trim(),
+        country: String(shippingAddress.country || 'India').trim()
+      },
+      paymentMethod: 'Razorpay',
       itemsPrice,
       taxPrice,
       shippingPrice,
       totalPrice,
-      status: 'Pending'
+      status: 'Pending',
+      isPaid: false
     });
 
     const createdOrder = await order.save();
 
-    // 2. Create Razorpay order
-    // Razorpay amount is in paise (1 INR = 100 paise)
+    // 2. Create Razorpay order (amount in paise: 1 INR = 100 paise)
     const amountInPaise = Math.round(totalPrice * 100);
 
     if (isMockRazorpay) {
-      const mockRazorpayOrderId = `order_mock_${Math.random().toString(36).substring(2, 15)}`;
+      const mockRazorpayOrderId = `order_mock_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       createdOrder.razorpayOrderId = mockRazorpayOrderId;
       await createdOrder.save();
 
@@ -73,13 +137,13 @@ const addOrderItems = async (req, res) => {
           currency: 'INR'
         },
         isMock: true,
-        razorpayKeyId: keyId || 'rzp_test_5V6vOqR4Z9Ua5v'
+        razorpayKeyId: keyId || 'rzp_test_mock_key'
       });
     } else {
       const options = {
         amount: amountInPaise,
         currency: 'INR',
-        receipt: `receipt_order_${createdOrder._id.toString().substring(0, 10)}`
+        receipt: `receipt_${createdOrder._id.toString().substring(0, 16)}`
       };
 
       try {
@@ -94,9 +158,8 @@ const addOrderItems = async (req, res) => {
           razorpayKeyId: keyId
         });
       } catch (err) {
-        console.error('Razorpay SDK Order Create failed, falling back to mock:', err.message);
-        // Fallback to mock order creation if API fails (network issue or invalid keys)
-        const mockOrderId = `order_mock_${Math.random().toString(36).substring(2, 15)}`;
+        console.error('Razorpay SDK Order Create failed, falling back to mock mode:', err.message);
+        const mockOrderId = `order_mock_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         createdOrder.razorpayOrderId = mockOrderId;
         await createdOrder.save();
 
@@ -108,12 +171,12 @@ const addOrderItems = async (req, res) => {
             currency: 'INR'
           },
           isMock: true,
-          razorpayKeyId: keyId || 'rzp_test_5V6vOqR4Z9Ua5v'
+          razorpayKeyId: keyId || 'rzp_test_mock_key'
         });
       }
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -128,6 +191,10 @@ const verifyPayment = async (req, res) => {
     razorpay_signature
   } = req.body;
 
+  if (!orderId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ message: 'Missing payment verification parameters' });
+  }
+
   try {
     const order = await Order.findById(orderId);
 
@@ -135,19 +202,44 @@ const verifyPayment = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    // Verify order ownership
+    const orderUserId = (order.user && order.user._id) ? order.user._id.toString() : (order.user ? order.user.toString() : null);
+    if (orderUserId !== req.user._id.toString() && !req.user.isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to verify payment for this order' });
+    }
+
+    // Idempotency: prevent double verification & multiple stock decrements
+    if (order.isPaid) {
+      return res.json({ message: 'Order payment is already verified', order });
+    }
+
+    // Check order ID match
+    if (order.razorpayOrderId && order.razorpayOrderId !== razorpay_order_id) {
+      return res.status(400).json({ message: 'Razorpay order ID mismatch' });
+    }
+
     let isVerified = false;
 
-    // Check if it's a mock payment
-    if (razorpay_order_id.startsWith('order_mock_') || isMockRazorpay) {
-      isVerified = true;
+    if (isMockRazorpay) {
+      // In mock mode, verify simulated payment identifiers
+      if (typeof razorpay_order_id === 'string' && razorpay_order_id.startsWith('order_mock_')) {
+        isVerified = true;
+      }
     } else {
-      // Real signature verification
-      const secret = process.env.RAZORPAY_KEY_SECRET;
-      const body = razorpay_order_id + '|' + razorpay_payment_id;
+      // In production mode, cryptographically verify Razorpay signature
+      if (typeof razorpay_order_id === 'string' && razorpay_order_id.startsWith('order_mock_')) {
+        return res.status(400).json({ message: 'Mock payment cannot be verified in live mode' });
+      }
 
+      const secret = process.env.RAZORPAY_KEY_SECRET;
+      if (!secret) {
+        return res.status(500).json({ message: 'Payment gateway configuration error on server' });
+      }
+
+      const body = razorpay_order_id + '|' + razorpay_payment_id;
       const expectedSignature = crypto
         .createHmac('sha256', secret)
-        .update(body.toString())
+        .update(body)
         .digest('hex');
 
       if (expectedSignature === razorpay_signature) {
@@ -157,27 +249,33 @@ const verifyPayment = async (req, res) => {
 
     if (isVerified) {
       order.isPaid = true;
-      order.paidAt = Date.now();
+      order.paidAt = new Date();
       order.status = 'Paid';
       order.razorpayPaymentId = razorpay_payment_id;
       order.razorpaySignature = razorpay_signature;
 
-      // Update product stock inventory
+      // Update product inventory stock
       for (const item of order.orderItems) {
-        const product = await Product.findById(item.product);
-        if (product) {
-          product.stock = Math.max(0, product.stock - item.qty);
-          await product.save();
+        const prodId = (item.product && typeof item.product === 'object' && item.product._id) 
+          ? item.product._id 
+          : item.product;
+        
+        if (prodId) {
+          const product = await Product.findById(prodId);
+          if (product) {
+            product.stock = Math.max(0, product.stock - (item.qty || 1));
+            await product.save();
+          }
         }
       }
 
       const updatedOrder = await order.save();
-      res.json({ message: 'Payment verified successfully', order: updatedOrder });
+      return res.json({ message: 'Payment verified successfully', order: updatedOrder });
     } else {
-      res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
+      return res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -187,9 +285,9 @@ const verifyPayment = async (req, res) => {
 const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
-    res.json(orders);
+    return res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -198,20 +296,26 @@ const getMyOrders = async (req, res) => {
 // @access  Private
 const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id).populate('user', 'name email');
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ message: 'Order ID is required' });
+    }
 
-    if (order) {
-      // Check if user is owner or admin
-      if (order.user._id.toString() === req.user._id.toString() || req.user.isAdmin) {
-        res.json(order);
-      } else {
-        res.status(403).json({ message: 'Not authorized to view this order' });
-      }
+    const order = await Order.findById(id).populate('user', 'name email');
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const orderUserId = (order.user && order.user._id) ? order.user._id.toString() : (order.user ? order.user.toString() : null);
+
+    if (orderUserId === req.user._id.toString() || req.user.isAdmin === true) {
+      return res.json(order);
     } else {
-      res.status(404).json({ message: 'Order not found' });
+      return res.status(403).json({ message: 'Not authorized to view this order' });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -220,10 +324,10 @@ const getOrderById = async (req, res) => {
 // @access  Private/Admin
 const getOrders = async (req, res) => {
   try {
-    const orders = await Order.find({}).populate('user', 'id name').sort({ createdAt: -1 });
-    res.json(orders);
+    const orders = await Order.find({}).populate('user', 'name email').sort({ createdAt: -1 });
+    return res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -232,27 +336,33 @@ const getOrders = async (req, res) => {
 // @access  Private/Admin
 const updateOrderStatus = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const { id } = req.params;
+    const { status } = req.body;
 
-    if (order) {
-      const { status } = req.body;
-      if (!['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status' });
-      }
-
-      order.status = status;
-      if (status === 'Delivered') {
-        order.isDelivered = true;
-        order.deliveredAt = Date.now();
-      }
-
-      const updatedOrder = await order.save();
-      res.json(updatedOrder);
-    } else {
-      res.status(404).json({ message: 'Order not found' });
+    const validStatuses = ['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
+
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    order.status = status;
+    if (status === 'Delivered') {
+      order.isDelivered = true;
+      order.deliveredAt = new Date();
+    } else if (status === 'Paid') {
+      order.isPaid = true;
+      if (!order.paidAt) order.paidAt = new Date();
+    }
+
+    const updatedOrder = await order.save();
+    return res.json(updatedOrder);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 

@@ -3,9 +3,9 @@ const { readData, writeData } = require('../config/mockDb');
 
 const orderItemSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  qty: { type: Number, required: true },
+  qty: { type: Number, required: true, min: 1 },
   image: { type: String, required: true },
-  price: { type: Number, required: true },
+  price: { type: Number, required: true, min: 0 },
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
@@ -25,7 +25,7 @@ const orderSchema = new mongoose.Schema({
     city: { type: String, required: true },
     state: { type: String, required: true },
     zipCode: { type: String, required: true },
-    country: { type: String, required: true }
+    country: { type: String, required: true, default: 'India' }
   },
   paymentMethod: { type: String, required: true, default: 'Razorpay' },
   razorpayOrderId: { type: String },
@@ -51,83 +51,34 @@ const orderSchema = new mongoose.Schema({
 
 const MongooseOrder = mongoose.model('Order', orderSchema);
 
-// Mock Query helper supporting chain methods
-class MockOrderQuery {
-  constructor(dataArray, isSingle = false) {
-    this.data = dataArray;
-    this.isSingle = isSingle;
-  }
-  populate(field) {
-    // We handle user population automatically in the then resolver
-    return this;
-  }
-  sort(sortObj) {
-    if (!sortObj) return this;
-    const field = Object.keys(sortObj)[0];
-    const order = sortObj[field];
-    
-    this.data.sort((a, b) => {
-      let valA = a[field];
-      let valB = b[field];
-      if (field === 'createdAt') {
-        valA = new Date(valA).getTime();
-        valB = new Date(valB).getTime();
-      }
-      if (valA < valB) return order === 1 ? -1 : 1;
-      if (valA > valB) return order === 1 ? 1 : -1;
-      return 0;
-    });
-    return this;
-  }
-  async then(resolve, reject) {
-    try {
-      const dbData = readData();
-      
-      // Populate user info if user field exists
-      const populated = this.data.map(order => {
-        const orderCopy = { ...order };
-        const userObj = dbData.users.find(u => u._id.toString() === order.user.toString());
-        if (userObj) {
-          orderCopy.user = {
-            _id: userObj._id,
-            name: userObj.name,
-            email: userObj.email
-          };
-        }
-        return new MockOrderInstance(orderCopy);
-      });
-
-      resolve(this.isSingle ? (populated[0] || null) : populated);
-    } catch (err) {
-      if (reject) reject(err);
-    }
-  }
-}
-
-// Mock Order model
-class MockOrder {
-  static find(query = {}) {
-    const data = readData();
-    let results = [...data.orders];
-
-    if (query.user) {
-      results = results.filter(o => o.user.toString() === query.user.toString());
-    }
-
-    return new MockOrderQuery(results);
-  }
-
-  static findById(id) {
-    const data = readData();
-    const order = data.orders.find(o => o._id === id);
-    return new MockOrderQuery(order ? [order] : [], true);
-  }
-}
-
 class MockOrderInstance {
   constructor(fields) {
-    Object.assign(this, fields);
+    Object.assign(this, JSON.parse(JSON.stringify(fields || {})));
+    if (!Array.isArray(this.orderItems)) this.orderItems = [];
   }
+
+  populate(field, select) {
+    const dbData = readData();
+    const rawUserId = (this.user && this.user._id) ? this.user._id.toString() : (this.user ? this.user.toString() : null);
+    if (rawUserId) {
+      const userObj = dbData.users.find(u => u._id.toString() === rawUserId);
+      if (userObj) {
+        this.user = {
+          _id: userObj._id,
+          name: userObj.name,
+          email: userObj.email
+        };
+      } else {
+        this.user = {
+          _id: rawUserId,
+          name: 'Customer',
+          email: ''
+        };
+      }
+    }
+    return this;
+  }
+
   async save() {
     const data = readData();
     
@@ -140,7 +91,7 @@ class MockOrderInstance {
     
     // Ensure we store just the user ID string in DB, not populated object
     const plainObj = JSON.parse(JSON.stringify(this));
-    if (plainObj.user && typeof plainObj.user === 'object') {
+    if (plainObj.user && typeof plainObj.user === 'object' && plainObj.user._id) {
       plainObj.user = plainObj.user._id;
     }
 
@@ -153,6 +104,104 @@ class MockOrderInstance {
 
     writeData(data);
     return this;
+  }
+}
+
+class MockOrderQuery {
+  constructor(dataArray, isSingle = false) {
+    this.data = Array.isArray(dataArray) ? [...dataArray] : [];
+    this.isSingle = isSingle;
+    this.shouldPopulate = false;
+  }
+
+  populate(field, select) {
+    this.shouldPopulate = true;
+    return this;
+  }
+
+  sort(sortObj) {
+    if (!sortObj) return this;
+    const field = Object.keys(sortObj)[0];
+    const order = sortObj[field];
+    
+    this.data.sort((a, b) => {
+      let valA = a[field];
+      let valB = b[field];
+      if (field === 'createdAt') {
+        valA = new Date(valA || 0).getTime();
+        valB = new Date(valB || 0).getTime();
+      }
+      if (valA < valB) return order === 1 ? -1 : 1;
+      if (valA > valB) return order === 1 ? 1 : -1;
+      return 0;
+    });
+    return this;
+  }
+
+  async then(resolve, reject) {
+    try {
+      const dbData = readData();
+      
+      const populated = this.data.map(order => {
+        const orderCopy = { ...order };
+        const rawUserId = (order.user && order.user._id) ? order.user._id.toString() : (order.user ? order.user.toString() : null);
+        if (rawUserId) {
+          const userObj = dbData.users.find(u => u._id.toString() === rawUserId);
+          if (userObj) {
+            orderCopy.user = {
+              _id: userObj._id,
+              name: userObj.name,
+              email: userObj.email
+            };
+          } else {
+            orderCopy.user = {
+              _id: rawUserId,
+              name: 'Customer',
+              email: ''
+            };
+          }
+        }
+        return new MockOrderInstance(orderCopy);
+      });
+
+      if (this.isSingle) {
+        return resolve(populated.length > 0 ? populated[0] : null);
+      }
+      return resolve(populated);
+    } catch (err) {
+      if (reject) return reject(err);
+      throw err;
+    }
+  }
+
+  catch(reject) {
+    return this.then(null, reject);
+  }
+}
+
+class MockOrder {
+  static find(query = {}) {
+    const data = readData();
+    let results = [...data.orders];
+
+    if (query.user) {
+      const targetUserId = query.user.toString();
+      results = results.filter(o => o.user && o.user.toString() === targetUserId);
+    }
+
+    return new MockOrderQuery(results, false);
+  }
+
+  static findById(id) {
+    if (!id) return new MockOrderQuery([], true);
+    const data = readData();
+    const order = data.orders.find(o => o._id.toString() === id.toString());
+    return new MockOrderQuery(order ? [order] : [], true);
+  }
+
+  static async countDocuments(query = {}) {
+    const data = readData();
+    return data.orders.length;
   }
 }
 
