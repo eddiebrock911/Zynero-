@@ -6,7 +6,10 @@
   <title>Zynero Premium Technology & Setup Store</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="has-webgl">
+
+  <canvas id="webgl-canvas" aria-hidden="true"></canvas>
+  <div class="webgl-vignette" aria-hidden="true"></div>
 
   <!-- Dyn Header -->
   <div id="header-wrapper"></div>
@@ -27,8 +30,10 @@
         
         <div class="hero-image-wrapper">
           <div class="hero-img-glow"></div>
-          <div class="hero-img-container">
-            <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600" alt="Zynero Setup" class="hero-img">
+          <div class="hero-hologram">
+            <span class="hero-ring hero-ring-a"></span>
+            <span class="hero-ring hero-ring-b"></span>
+            <span class="hero-core-label">NEURAL CORE</span>
           </div>
         </div>
       </div>
@@ -110,5 +115,7 @@
   <script src="js/api.js"></script>
   <script src="js/common.js"></script>
   <script src="js/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="js/webgl-scene.js"></script>
 </body>
 </html>
