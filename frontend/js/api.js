@@ -1,8 +1,8 @@
-// Determine API Base URL
+// Determine API Base URL dynamically
 let API_BASE = '/api';
 
-// If running frontend locally from file system or a different port (e.g. VS Code Live Server)
-if (window.location.protocol === 'file:' || window.location.port === '5500' || window.location.port === '3000') {
+// Fallback to local server only when opening HTML files directly from filesystem
+if (window.location.protocol === 'file:') {
   API_BASE = 'http://localhost:5000/api';
 }
 
@@ -26,16 +26,22 @@ const apiFetch = async (endpoint, options = {}) => {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, config);
     
-    // Check if empty response (like DELETE request)
+    // Check response content type
     const contentType = response.headers.get('content-type');
     let data = {};
     if (contentType && contentType.includes('application/json')) {
       data = await response.json();
     } else {
-      data = { message: await response.text() };
+      const text = await response.text();
+      data = { message: text || 'Server response error' };
     }
 
     if (!response.ok) {
+      // Handle expired or invalid session token
+      if (response.status === 401 && token) {
+        localStorage.removeItem('zynero_token');
+        localStorage.removeItem('zynero_user');
+      }
       throw new Error(data.message || 'Server error occurred');
     }
 

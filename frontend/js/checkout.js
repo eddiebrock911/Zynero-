@@ -35,168 +35,187 @@ document.addEventListener('DOMContentLoaded', () => {
   const mockFailBtn = document.getElementById('mock-pay-fail-btn');
 
   // Populate Saved Address if exists
-  if (user && user.addresses && user.addresses.length > 0) {
+  if (user && Array.isArray(user.addresses) && user.addresses.length > 0) {
     const saved = user.addresses[user.addresses.length - 1];
-    document.getElementById('ship-street').value = saved.street || '';
-    document.getElementById('ship-city').value = saved.city || '';
-    document.getElementById('ship-state').value = saved.state || '';
-    document.getElementById('ship-zip').value = saved.zipCode || '';
-    document.getElementById('ship-country').value = saved.country || 'India';
+    if (document.getElementById('ship-street')) document.getElementById('ship-street').value = saved.street || '';
+    if (document.getElementById('ship-city')) document.getElementById('ship-city').value = saved.city || '';
+    if (document.getElementById('ship-state')) document.getElementById('ship-state').value = saved.state || '';
+    if (document.getElementById('ship-zip')) document.getElementById('ship-zip').value = saved.zipCode || '';
+    if (document.getElementById('ship-country')) document.getElementById('ship-country').value = saved.country || 'India';
   }
 
   // Render items summary
   let subtotal = 0;
-  summaryItems.innerHTML = '';
+  if (summaryItems) {
+    summaryItems.innerHTML = '';
 
-  cart.forEach(item => {
-    const prod = item.product;
-    const itemTotal = prod.price * item.qty;
-    subtotal += itemTotal;
+    cart.forEach(item => {
+      const prod = item.product || {};
+      const price = Number(prod.price) || 0;
+      const qty = Number(item.qty) || 1;
+      const itemTotal = price * qty;
+      subtotal += itemTotal;
 
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.justify = 'space-between';
-    row.style.alignItems = 'center';
-    row.style.fontSize = '13px';
-    row.style.marginBottom = '12px';
-    
-    row.innerHTML = `
-      <div style="max-width: 70%;">
-        <span style="font-weight: 600; color: var(--text-main);">${prod.name}</span>
-        <span style="color: var(--text-muted); font-size: 11px; display: block;">Qty: ${item.qty} × ₹${prod.price.toLocaleString('en-IN')}</span>
-      </div>
-      <span style="font-weight: 700;">₹${itemTotal.toLocaleString('en-IN')}</span>
-    `;
-    summaryItems.appendChild(row);
-  });
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.justify = 'space-between';
+      row.style.alignItems = 'center';
+      row.style.fontSize = '13px';
+      row.style.marginBottom = '12px';
+      
+      row.innerHTML = `
+        <div style="max-width: 70%;">
+          <span style="font-weight: 600; color: var(--text-main);">${prod.name || 'Product'}</span>
+          <span style="color: var(--text-muted); font-size: 11px; display: block;">Qty: ${qty} × ₹${price.toLocaleString('en-IN')}</span>
+        </div>
+        <span style="font-weight: 700;">₹${itemTotal.toLocaleString('en-IN')}</span>
+      `;
+      summaryItems.appendChild(row);
+    });
+  }
 
   const shipping = subtotal > 10000 ? 0 : 150;
   const tax = Math.round(subtotal * 0.18);
   const total = subtotal + shipping + tax;
 
-  subtotalEl.textContent = `₹${subtotal.toLocaleString('en-IN')}`;
-  shippingEl.textContent = shipping === 0 ? 'FREE' : `₹${shipping}`;
-  taxEl.textContent = `₹${tax.toLocaleString('en-IN')}`;
-  totalEl.textContent = `₹${total.toLocaleString('en-IN')}`;
+  if (subtotalEl) subtotalEl.textContent = `₹${subtotal.toLocaleString('en-IN')}`;
+  if (shippingEl) shippingEl.textContent = shipping === 0 ? 'FREE' : `₹${shipping}`;
+  if (taxEl) taxEl.textContent = `₹${tax.toLocaleString('en-IN')}`;
+  if (totalEl) totalEl.textContent = `₹${total.toLocaleString('en-IN')}`;
 
   let currentOrderId = null;
   let currentRazorpayOrderId = null;
+  let isSubmitting = false;
 
   // Process Checkout
-  placeOrderBtn.addEventListener('click', async (e) => {
-    e.preventDefault();
+  if (placeOrderBtn) {
+    placeOrderBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
 
-    if (!checkoutForm.reportValidity()) {
-      showToast('Please specify all shipping details', 'warning');
-      return;
-    }
+      if (isSubmitting) return;
 
-    placeOrderBtn.disabled = true;
-    placeOrderBtn.textContent = 'Processing Transaction...';
-
-    const street = document.getElementById('ship-street').value.trim();
-    const city = document.getElementById('ship-city').value.trim();
-    const state = document.getElementById('ship-state').value.trim();
-    const zipCode = document.getElementById('ship-zip').value.trim();
-    const country = document.getElementById('ship-country').value.trim();
-    const saveAddress = document.getElementById('save-address-checkbox').checked;
-
-    const shippingAddress = { street, city, state, zipCode, country };
-
-    const orderItems = cart.map(item => ({
-      name: item.product.name,
-      qty: item.qty,
-      image: item.product.images && item.product.images.length ? item.product.images[0] : 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500',
-      price: item.product.price,
-      product: item.product._id
-    }));
-
-    try {
-      // Address Sync
-      if (saveAddress && user) {
-        const addrExists = user.addresses.some(a => a.street === street && a.zipCode === zipCode);
-        if (!addrExists) {
-          const updatedAddresses = [...(user.addresses || []), shippingAddress];
-          const updateRes = await apiFetch('/users/profile', {
-            method: 'PUT',
-            body: JSON.stringify({ addresses: updatedAddresses })
-          });
-          localStorage.setItem('zynero_user', JSON.stringify({
-            ...user,
-            addresses: updateRes.addresses
-          }));
-        }
+      if (!checkoutForm || !checkoutForm.reportValidity()) {
+        showToast('Please specify all shipping details', 'warning');
+        return;
       }
 
-      // Order creation
-      const orderPayload = {
-        orderItems,
-        shippingAddress,
-        itemsPrice: subtotal,
-        taxPrice: tax,
-        shippingPrice: shipping,
-        totalPrice: total
-      };
+      const street = document.getElementById('ship-street').value.trim();
+      const city = document.getElementById('ship-city').value.trim();
+      const state = document.getElementById('ship-state').value.trim();
+      const zipCode = document.getElementById('ship-zip').value.trim();
+      const country = document.getElementById('ship-country').value.trim();
+      const saveAddressCheckbox = document.getElementById('save-address-checkbox');
+      const saveAddress = saveAddressCheckbox ? saveAddressCheckbox.checked : false;
 
-      const resData = await apiFetch('/orders', {
-        method: 'POST',
-        body: JSON.stringify(orderPayload)
-      });
+      if (!street || !city || !state || !zipCode) {
+        showToast('Please fill in all address fields', 'warning');
+        return;
+      }
 
-      currentOrderId = resData.order._id;
-      currentRazorpayOrderId = resData.razorpayOrder.id;
+      isSubmitting = true;
+      placeOrderBtn.disabled = true;
+      placeOrderBtn.textContent = 'Processing Transaction...';
 
-      if (resData.isMock) {
-        // Toggle simulator overlay modal
-        mockOrderIdEl.textContent = currentRazorpayOrderId;
-        mockAmountEl.textContent = `₹${total.toLocaleString('en-IN')}`;
-        mockModal.style.display = 'flex';
-      } else {
-        // Run Real Razorpay Checkout
-        const options = {
-          key: resData.razorpayKeyId,
-          amount: resData.razorpayOrder.amount,
-          currency: resData.razorpayOrder.currency,
-          name: "Zynero Premium Store",
-          description: "Payment Checkout transaction",
-          order_id: currentRazorpayOrderId,
-          handler: async function (response) {
-            await verifyPaymentSignature(
-              response.razorpay_order_id,
-              response.razorpay_payment_id,
-              response.razorpay_signature
-            );
-          },
-          prefill: {
-            name: user.name,
-            email: user.email
-          },
-          theme: {
-            color: "#8b5cf6"
-          },
-          modal: {
-            ondismiss: function () {
-              showToast('Payment window closed. Order is pending.', 'warning');
-              placeOrderBtn.disabled = false;
-              placeOrderBtn.textContent = 'Proceed to Payment';
+      const shippingAddress = { street, city, state, zipCode, country: country || 'India' };
+
+      const orderItems = cart.map(item => ({
+        product: item.product._id,
+        qty: item.qty
+      }));
+
+      try {
+        // Address Sync
+        if (saveAddress && user) {
+          const addrExists = (user.addresses || []).some(a => a.street === street && a.zipCode === zipCode);
+          if (!addrExists) {
+            try {
+              const updatedAddresses = [...(user.addresses || []), shippingAddress];
+              const updateRes = await apiFetch('/users/profile', {
+                method: 'PUT',
+                body: JSON.stringify({ addresses: updatedAddresses })
+              });
+              localStorage.setItem('zynero_user', JSON.stringify({
+                ...user,
+                addresses: updateRes.addresses
+              }));
+            } catch (e) {
+              console.warn('Could not save address to profile:', e);
             }
           }
-        };
-        const rzp = new Razorpay(options);
-        rzp.open();
-      }
+        }
 
-    } catch (err) {
-      showToast(err.message, 'error');
-      placeOrderBtn.disabled = false;
-      placeOrderBtn.textContent = 'Proceed to Payment';
-    }
-  });
+        // Order creation
+        const orderPayload = {
+          orderItems,
+          shippingAddress
+        };
+
+        const resData = await apiFetch('/orders', {
+          method: 'POST',
+          body: JSON.stringify(orderPayload)
+        });
+
+        currentOrderId = resData.order._id;
+        currentRazorpayOrderId = resData.razorpayOrder ? resData.razorpayOrder.id : resData.order.razorpayOrderId;
+
+        if (resData.isMock) {
+          // Toggle simulator overlay modal
+          if (mockOrderIdEl) mockOrderIdEl.textContent = currentRazorpayOrderId;
+          if (mockAmountEl) mockAmountEl.textContent = `₹${(resData.order.totalPrice || total).toLocaleString('en-IN')}`;
+          if (mockModal) mockModal.style.display = 'flex';
+        } else {
+          // Run Real Razorpay Checkout
+          if (typeof Razorpay === 'undefined') {
+            throw new Error('Razorpay SDK failed to load. Please refresh and try again.');
+          }
+
+          const options = {
+            key: resData.razorpayKeyId,
+            amount: resData.razorpayOrder.amount,
+            currency: resData.razorpayOrder.currency || 'INR',
+            name: "Zynero Premium Store",
+            description: "Payment Checkout transaction",
+            order_id: currentRazorpayOrderId,
+            handler: async function (response) {
+              await verifyPaymentSignature(
+                response.razorpay_order_id,
+                response.razorpay_payment_id,
+                response.razorpay_signature
+              );
+            },
+            prefill: {
+              name: user.name || '',
+              email: user.email || ''
+            },
+            theme: {
+              color: "#8b5cf6"
+            },
+            modal: {
+              ondismiss: function () {
+                showToast('Payment window closed. Order is pending.', 'warning');
+                isSubmitting = false;
+                placeOrderBtn.disabled = false;
+                placeOrderBtn.textContent = 'Proceed to Payment';
+              }
+            }
+          };
+          const rzp = new Razorpay(options);
+          rzp.open();
+        }
+
+      } catch (err) {
+        showToast(err.message, 'error');
+        isSubmitting = false;
+        placeOrderBtn.disabled = false;
+        placeOrderBtn.textContent = 'Proceed to Payment';
+      }
+    });
+  }
 
   // Verification helper
   async function verifyPaymentSignature(rzp_order_id, rzp_payment_id, rzp_signature) {
     try {
-      const verifyRes = await apiFetch('/orders/verify', {
+      await apiFetch('/orders/verify', {
         method: 'POST',
         body: JSON.stringify({
           orderId: currentOrderId,
@@ -225,23 +244,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } catch (err) {
       showToast(err.message, 'error');
-      placeOrderBtn.disabled = false;
-      placeOrderBtn.textContent = 'Proceed to Payment';
+      isSubmitting = false;
+      if (placeOrderBtn) {
+        placeOrderBtn.disabled = false;
+        placeOrderBtn.textContent = 'Proceed to Payment';
+      }
     }
   }
 
   // Simulator bindings
-  mockSuccessBtn.addEventListener('click', async () => {
-    mockModal.style.display = 'none';
-    const mockPaymentId = `pay_mock_${Math.random().toString(36).substring(2, 12)}`;
-    const mockSignature = `sig_mock_${Math.random().toString(36).substring(2, 20)}`;
-    await verifyPaymentSignature(currentRazorpayOrderId, mockPaymentId, mockSignature);
-  });
+  if (mockSuccessBtn) {
+    mockSuccessBtn.addEventListener('click', async () => {
+      if (mockModal) mockModal.style.display = 'none';
+      const mockPaymentId = `pay_mock_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const mockSignature = `sig_mock_${Date.now()}_${Math.random().toString(36).substring(2, 12)}`;
+      await verifyPaymentSignature(currentRazorpayOrderId, mockPaymentId, mockSignature);
+    });
+  }
 
-  mockFailBtn.addEventListener('click', () => {
-    mockModal.style.display = 'none';
-    showToast('Payment simulation cancelled.', 'error');
-    placeOrderBtn.disabled = false;
-    placeOrderBtn.textContent = 'Proceed to Payment';
-  });
+  if (mockFailBtn) {
+    mockFailBtn.addEventListener('click', () => {
+      if (mockModal) mockModal.style.display = 'none';
+      showToast('Payment simulation cancelled.', 'info');
+      isSubmitting = false;
+      if (placeOrderBtn) {
+        placeOrderBtn.disabled = false;
+        placeOrderBtn.textContent = 'Proceed to Payment';
+      }
+    });
+  }
 });

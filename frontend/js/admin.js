@@ -3,7 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const user = getUser();
   if (!user || !user.isAdmin) {
     showToast('Unauthorized access. Admin privileges required.', 'error');
-    window.location.href = 'index.html';
+    setTimeout(() => {
+      window.location.href = 'index.html';
+    }, 1000);
     return;
   }
 
@@ -45,28 +47,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Tab View Switcher helper
   function showSection(section) {
-    [secOverview, secProducts, secOrders].forEach(s => s.style.display = 'none');
-    [overviewBtn, productsBtn, ordersBtn].forEach(b => b.classList.remove('active'));
+    if (secOverview) secOverview.style.display = 'none';
+    if (secProducts) secProducts.style.display = 'none';
+    if (secOrders) secOrders.style.display = 'none';
+
+    if (overviewBtn) overviewBtn.classList.remove('active');
+    if (productsBtn) productsBtn.classList.remove('active');
+    if (ordersBtn) ordersBtn.classList.remove('active');
 
     if (section === 'overview') {
-      secOverview.style.display = 'block';
-      overviewBtn.classList.add('active');
+      if (secOverview) secOverview.style.display = 'block';
+      if (overviewBtn) overviewBtn.classList.add('active');
       loadOverviewMetrics();
     } else if (section === 'products') {
-      secProducts.style.display = 'block';
-      productsBtn.classList.add('active');
+      if (secProducts) secProducts.style.display = 'block';
+      if (productsBtn) productsBtn.classList.add('active');
       loadAdminProducts();
     } else if (section === 'orders') {
-      secOrders.style.display = 'block';
-      ordersBtn.classList.add('active');
+      if (secOrders) secOrders.style.display = 'block';
+      if (ordersBtn) ordersBtn.classList.add('active');
       loadAdminOrders();
     }
   }
 
   // Bind Menu Click listeners
-  overviewBtn.addEventListener('click', () => showSection('overview'));
-  productsBtn.addEventListener('click', () => showSection('products'));
-  ordersBtn.addEventListener('click', () => showSection('orders'));
+  if (overviewBtn) overviewBtn.addEventListener('click', () => showSection('overview'));
+  if (productsBtn) productsBtn.addEventListener('click', () => showSection('products'));
+  if (ordersBtn) ordersBtn.addEventListener('click', () => showSection('orders'));
 
   // ==========================================================================
   // Dashboard Overview Metrics
@@ -77,12 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const orders = await apiFetch('/orders');
 
       // Calculate gross sales
-      const paidOrders = orders.filter(o => o.isPaid);
-      const revenue = paidOrders.reduce((sum, o) => sum + o.totalPrice, 0);
+      const paidOrders = Array.isArray(orders) ? orders.filter(o => o && o.isPaid) : [];
+      const revenue = paidOrders.reduce((sum, o) => sum + (Number(o.totalPrice) || 0), 0);
 
-      metricRev.textContent = `₹${revenue.toLocaleString('en-IN')}`;
-      metricOrd.textContent = orders.length;
-      metricProd.textContent = products.length;
+      if (metricRev) metricRev.textContent = `₹${revenue.toLocaleString('en-IN')}`;
+      if (metricOrd) metricOrd.textContent = Array.isArray(orders) ? orders.length : 0;
+      if (metricProd) metricProd.textContent = Array.isArray(products) ? products.length : 0;
 
     } catch (err) {
       showToast('Error loading metrics data.', 'error');
@@ -93,12 +100,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Product Inventory Management CRUD
   // ==========================================================================
   async function loadAdminProducts() {
+    if (!productsTbody) return;
     productsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Fetching catalog...</td></tr>';
     try {
       const products = await apiFetch('/products');
       productsTbody.innerHTML = '';
 
-      if (products.length === 0) {
+      if (!Array.isArray(products) || products.length === 0) {
         productsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No products registered yet.</td></tr>';
         return;
       }
@@ -111,13 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
         row.innerHTML = `
           <td>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <img src="${image}" alt="${p.name}" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;">
-              <div style="font-weight: 600;">${p.name}</div>
+              <img src="${image}" alt="${p.name || 'Product'}" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;">
+              <div style="font-weight: 600;">${p.name || 'Product'}</div>
             </div>
           </td>
-          <td><span class="status-badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); text-transform: capitalize;">${p.category}</span></td>
-          <td style="font-weight: 600;">₹${p.price.toLocaleString('en-IN')}</td>
-          <td>${p.stock} units</td>
+          <td><span class="status-badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); text-transform: capitalize;">${p.category || 'Tech'}</span></td>
+          <td style="font-weight: 600;">₹${(Number(p.price) || 0).toLocaleString('en-IN')}</td>
+          <td>${p.stock || 0} units</td>
           <td style="text-align: right;">
             <button class="btn btn-secondary edit-btn" style="padding: 6px 12px; font-size: 12px; margin-right: 8px;">Edit</button>
             <button class="btn btn-danger delete-btn" style="padding: 6px 12px; font-size: 12px;">Delete</button>
@@ -138,78 +146,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open Create/Edit modal
   function openProductModal(p = null) {
+    if (!prodForm) return;
     prodForm.reset();
     if (p) {
       // Edit mode
-      modalTitle.textContent = 'Edit Product Listing';
-      inputId.value = p._id;
-      inputName.value = p.name;
-      inputPrice.value = p.price;
-      inputStock.value = p.stock;
-      inputCategory.value = p.category;
-      inputImage.value = p.images && p.images.length ? p.images[0] : '';
-      inputDesc.value = p.description;
+      if (modalTitle) modalTitle.textContent = 'Edit Product Listing';
+      if (inputId) inputId.value = p._id;
+      if (inputName) inputName.value = p.name || '';
+      if (inputPrice) inputPrice.value = p.price !== undefined ? p.price : '';
+      if (inputStock) inputStock.value = p.stock !== undefined ? p.stock : '';
+      if (inputCategory) inputCategory.value = p.category || 'Audio';
+      if (inputImage) inputImage.value = p.images && p.images.length ? p.images[0] : '';
+      if (inputDesc) inputDesc.value = p.description || '';
     } else {
       // Create mode
-      modalTitle.textContent = 'Create Product Listing';
-      inputId.value = '';
+      if (modalTitle) modalTitle.textContent = 'Create Product Listing';
+      if (inputId) inputId.value = '';
     }
-    prodModal.style.display = 'flex';
+    if (prodModal) prodModal.style.display = 'flex';
   }
 
   // Close modal
   function closeProductModal() {
-    prodModal.style.display = 'none';
+    if (prodModal) prodModal.style.display = 'none';
   }
 
-  formCancelBtn.addEventListener('click', closeProductModal);
-  addProdModalBtn.addEventListener('click', () => openProductModal());
+  if (formCancelBtn) formCancelBtn.addEventListener('click', closeProductModal);
+  if (addProdModalBtn) addProdModalBtn.addEventListener('click', () => openProductModal());
 
   // Form Submit (Create / Edit)
-  prodForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  if (prodForm) {
+    prodForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    const id = inputId.value;
-    const name = inputName.value.trim();
-    const price = Number(inputPrice.value);
-    const stock = Number(inputStock.value);
-    const category = inputCategory.value;
-    const images = [inputImage.value.trim()];
-    const description = inputDesc.value.trim();
+      const id = inputId.value;
+      const name = inputName.value.trim();
+      const price = Number(inputPrice.value);
+      const stock = Number(inputStock.value);
+      const category = inputCategory.value;
+      const imageVal = inputImage.value.trim();
+      const images = imageVal ? [imageVal] : ['https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500'];
+      const description = inputDesc.value.trim();
 
-    const payload = { name, price, stock, category, images, description };
-
-    const saveBtn = document.getElementById('form-submit-btn');
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
-
-    try {
-      if (id) {
-        // Edit PUT
-        await apiFetch(`/products/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload)
-        });
-        showToast('Product updated successfully!', 'success');
-      } else {
-        // Create POST
-        await apiFetch('/products', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        showToast('Product created successfully!', 'success');
+      if (!name || isNaN(price) || price < 0 || isNaN(stock) || stock < 0 || !category || !description) {
+        showToast('Please provide valid product details with non-negative price and stock', 'warning');
+        return;
       }
 
-      closeProductModal();
-      loadAdminProducts();
+      const payload = { name, price, stock, category, images, description };
 
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Product';
-    }
-  });
+      if (formSubmitBtn) {
+        formSubmitBtn.disabled = true;
+        formSubmitBtn.textContent = 'Saving...';
+      }
+
+      try {
+        if (id) {
+          // Edit PUT
+          await apiFetch(`/products/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+          showToast('Product updated successfully!', 'success');
+        } else {
+          // Create POST
+          await apiFetch('/products', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+          showToast('Product created successfully!', 'success');
+        }
+
+        closeProductModal();
+        loadAdminProducts();
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        if (formSubmitBtn) {
+          formSubmitBtn.disabled = false;
+          formSubmitBtn.textContent = 'Save Product';
+        }
+      }
+    });
+  }
 
   // Delete product
   async function deleteProduct(productId) {
@@ -230,12 +250,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Customer Orders Fulfillment Dispatch Tracking
   // ==========================================================================
   async function loadAdminOrders() {
+    if (!ordersTbody) return;
     ordersTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Fetching orders...</td></tr>';
     try {
       const orders = await apiFetch('/orders');
       ordersTbody.innerHTML = '';
 
-      if (orders.length === 0) {
+      if (!Array.isArray(orders) || orders.length === 0) {
         ordersTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No orders registered.</td></tr>';
         return;
       }
@@ -243,22 +264,24 @@ document.addEventListener('DOMContentLoaded', () => {
       orders.forEach(o => {
         const row = document.createElement('tr');
         
-        const date = new Date(o.createdAt).toLocaleDateString('en-IN', {
+        const date = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN', {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
-        });
+        }) : 'Recent';
 
         const payStatusHTML = o.isPaid 
           ? `<span class="status-badge paid" style="font-size: 11px;">Paid</span>`
           : `<span class="status-badge pending" style="font-size: 11px;">Pending</span>`;
 
+        const customerName = (o.user && typeof o.user === 'object' && o.user.name) ? o.user.name : 'Customer';
+
         row.innerHTML = `
           <td><span style="font-family: monospace; font-size: 12px; font-weight: 600;">${o._id}</span></td>
-          <td><div style="font-weight: 600;">${o.user ? o.user.name : 'Guest User'}</div></td>
+          <td><div style="font-weight: 600;">${customerName}</div></td>
           <td style="font-size: 12px; color: var(--text-muted);">${date}</td>
-          <td style="font-weight: 600;">₹${o.totalPrice.toLocaleString('en-IN')}</td>
+          <td style="font-weight: 600;">₹${(Number(o.totalPrice) || 0).toLocaleString('en-IN')}</td>
           <td>${payStatusHTML}</td>
           <td style="text-align: right;">
             <select class="form-control status-select" data-id="${o._id}" style="padding: 6px 12px; font-size: 12px; width: fit-content; display: inline-block; background: var(--bg-card); border-color: rgba(255,255,255,0.08);">
@@ -274,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Bind initial status value
         const select = row.querySelector('.status-select');
-        select.value = o.status;
+        select.value = o.status || 'Pending';
 
         // Bind Change Listener
         select.addEventListener('change', async (e) => {
@@ -286,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
               body: JSON.stringify({ status: newStatus })
             });
             showToast(`Order status updated to ${newStatus}`, 'success');
+            o.status = newStatus;
           } catch (err) {
             showToast(err.message, 'error');
             select.value = o.status; // Revert

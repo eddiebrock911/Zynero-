@@ -41,7 +41,8 @@ function getUser() {
   const userStr = localStorage.getItem('zynero_user');
   if (userStr) {
     try {
-      return JSON.parse(userStr);
+      const user = JSON.parse(userStr);
+      return user && typeof user === 'object' ? user : null;
     } catch (e) {
       return null;
     }
@@ -54,7 +55,11 @@ function getLocalCart() {
   const cartStr = localStorage.getItem('zynero_cart');
   if (cartStr) {
     try {
-      return JSON.parse(cartStr);
+      const parsed = JSON.parse(cartStr);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => item && item.product && item.product._id && (item.qty > 0));
+      }
+      return [];
     } catch (e) {
       return [];
     }
@@ -64,14 +69,15 @@ function getLocalCart() {
 
 // Save Cart Items
 function saveLocalCart(cart) {
-  localStorage.setItem('zynero_cart', JSON.stringify(cart));
+  const validCart = Array.isArray(cart) ? cart.filter(item => item && item.product && item.product._id && (item.qty > 0)) : [];
+  localStorage.setItem('zynero_cart', JSON.stringify(validCart));
   updateCartBadge();
 }
 
 // Update Cart Badge Count
 function updateCartBadge() {
   const cart = getLocalCart();
-  const count = cart.reduce((sum, item) => sum + item.qty, 0);
+  const count = cart.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
   const badge = document.getElementById('cart-count-badge');
   if (badge) {
     if (count > 0) {
@@ -93,18 +99,23 @@ async function syncCartWithServer() {
     // If local cart is empty, fetch cart from server to populate local
     try {
       const serverCart = await apiFetch('/cart');
-      const formattedItems = serverCart.items.map(item => ({
-        product: {
-          _id: item.product._id,
-          name: item.product.name,
-          price: item.product.price,
-          images: item.product.images,
-          stock: item.product.stock
-        },
-        qty: item.qty
-      }));
-      localStorage.setItem('zynero_cart', JSON.stringify(formattedItems));
-      updateCartBadge();
+      if (serverCart && Array.isArray(serverCart.items)) {
+        const formattedItems = serverCart.items
+          .filter(item => item && item.product && item.product._id)
+          .map(item => ({
+            product: {
+              _id: item.product._id,
+              name: item.product.name,
+              price: item.product.price,
+              images: item.product.images,
+              stock: item.product.stock,
+              category: item.product.category
+            },
+            qty: Number(item.qty) || 1
+          }));
+        localStorage.setItem('zynero_cart', JSON.stringify(formattedItems));
+        updateCartBadge();
+      }
     } catch (err) {
       console.error('Failed to fetch server cart:', err);
     }
@@ -127,21 +138,35 @@ async function syncCartWithServer() {
 
 // Add Item to Cart
 async function addItemToCart(product, qty = 1) {
+  if (!product || !product._id) return false;
+  
   let cart = getLocalCart();
   const existing = cart.find(item => item.product._id === product._id);
 
+  const availableStock = typeof product.stock === 'number' ? product.stock : 999;
+
   if (existing) {
-    if (existing.qty + qty > product.stock) {
-      showToast(`Cannot add more items. Only ${product.stock} in stock.`, 'warning');
+    if (existing.qty + qty > availableStock) {
+      showToast(`Cannot add more items. Only ${availableStock} in stock.`, 'warning');
       return false;
     }
     existing.qty += qty;
   } else {
-    if (qty > product.stock) {
-      showToast(`Cannot add. Only ${product.stock} in stock.`, 'warning');
+    if (qty > availableStock) {
+      showToast(`Cannot add. Only ${availableStock} in stock.`, 'warning');
       return false;
     }
-    cart.push({ product, qty });
+    cart.push({
+      product: {
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        images: product.images,
+        stock: product.stock,
+        category: product.category
+      },
+      qty
+    });
   }
 
   saveLocalCart(cart);
@@ -182,13 +207,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const headerContainer = document.getElementById('header-wrapper');
   if (headerContainer) {
     const user = getUser();
-    const isAdmin = user && user.isAdmin;
+    const isAdmin = Boolean(user && user.isAdmin);
     
     let userSectionHTML = `
       <a href="auth.html" class="btn btn-primary btn-sm">Log In</a>
     `;
 
-    if (user) {
+    if (user && user.name) {
       userSectionHTML = `
         <div style="display: flex; align-items: center; gap: 15px;">
           <a href="dashboard.html" class="nav-link" style="font-weight: 600;">👋 ${user.name.split(' ')[0]}</a>
